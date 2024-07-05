@@ -9,7 +9,7 @@ use tfhe::{ClientKey, ConfigBuilder, FheUint, FheUint16, FheUint16Id, FheUint32,
 use tfhe::prelude::{FheDecrypt, FheEncrypt};
 
 fn main() -> Result<(), Box<dyn std::error::Error>>{
-    my_key_gen()?;
+    //my_key_gen()?;
 
     println!("reading client key...");
     let mut byte_vec = fs::read("client_key.bin")?;
@@ -18,9 +18,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
     let ck = deserialize_ck(&byte_vec.into_boxed_slice().deref())?;
 
     println!("encrypting string...");
-    let enc_data = encryptStr("the apple", &ck);
+    let enc_data = encryptStr("aa", &ck);
+    let enc_ascii = encryptascii("aa", &ck);
 
-    println!("serializing ciphertext...");
+    println!("serializing encrypted string...");
     let mut serialized_enc_str = Vec::new();
     for i in enc_data.clone() {
         bincode::serialize_into(&mut serialized_enc_str, &i)?;
@@ -29,38 +30,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
     file_str.write(serialized_enc_str.as_slice())?;
     println!("done");
 
-    let s = decryptStr(enc_data.clone(), &ck);
-    println!("the decrypted str is{}",s);
+    println!("serializing encrypted ascii...");
+    let mut serialized_enc_str = Vec::new();
+    for i in enc_ascii.clone() {
+        bincode::serialize_into(&mut serialized_enc_str, &i)?;
+    }
+    let mut file_str = File::create("encrypted_ascii.bin")?;
+    file_str.write(serialized_enc_str.as_slice())?;
+    println!("done");
+
+    //println!("deserializing intercepted_payload.bin...");
+    //let file = fs::read("encrypted_str.bin")?;
+    //let enc_str = deserialize_str(&file)?;
+
+    //let s = decryptStr(enc_str.clone(), &ck);
+    //println!("the decrypted str is {}",s);
 
     Ok(())
 
 }
 
+
+pub fn encryptascii(content: &str, ck: &ClientKey) -> Vec<FheUint<FheUint32Id>>{
+    let mut v = vec![];
+    for byte in content.bytes() {
+        //let encode_char = byte - 97 + 0*2;
+        v.push(FheUint32::encrypt(byte, ck));
+    }
+    v
+}
+
 pub fn encryptStr(content: &str, ck: &ClientKey) -> Vec<FheUint<FheUint32Id>> {
     let mut v:Vec<u8> = content.chars().map(|c| match c {
         'a' => 1,
-        'p' => 2,
-        'l' => 3,
-        'e' => 4,
-        _ => 5,
+        'b' => 2,
+        _ => 3,
     }).collect();
+    println!("encryptedstr is{:?}:", v);
 
     let mut r = vec![];
-
     for i in v{
         r.push(FheUint32::encrypt(i, ck));
     }
     r
 
-    /*
-    let mut v = vec![];
-    for byte in content.bytes() {
-        let encode_char = byte - 97 + 0*2;
-        v.push(FheUint32::encrypt(encode_char, ck));
-    }
-    v
-
-     */
     /*
     let fhe_bytes: Vec<FheUint8> = content
         .bytes()
@@ -73,9 +86,7 @@ pub fn encryptStr(content: &str, ck: &ClientKey) -> Vec<FheUint<FheUint32Id>> {
 fn decode_char(code: u32) -> char {
     match code {
         1 => 'a',
-        2 => 'p',
-        3 => 'l',
-        4 => 'e',
+        2 => 'b',
         _ => 'X',
     }
 }
@@ -112,6 +123,17 @@ fn my_key_gen() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 
 
+}
+fn deserialize_str(
+    serialized_data: &[u8],
+) -> Result<Vec<FheUint<FheUint32Id>>, Box<dyn std::error::Error>> {
+    let mut to_des_data = Cursor::new(serialized_data);
+    let mut v: Vec<FheUint<FheUint32Id>> = vec![];
+    for _ in 0..6 {
+        // length of received string
+        v.push(bincode::deserialize_from(&mut to_des_data)?);
+    }
+    Ok(v)
 }
 
 pub fn decryptStr(content: Vec<FheUint<FheUint32Id>>, ck: &ClientKey) -> String {
