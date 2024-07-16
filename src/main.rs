@@ -9,7 +9,7 @@ use tfhe::{ClientKey, ConfigBuilder, FheUint, FheUint16, FheUint16Id, FheUint32,
 use tfhe::prelude::{FheDecrypt, FheEncrypt};
 
 fn main() -> Result<(), Box<dyn std::error::Error>>{
-    //my_key_gen()?;
+    my_key_gen()?;
 
     println!("reading client key...");
     let mut byte_vec = fs::read("client_key.bin")?;
@@ -18,8 +18,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
     let ck = deserialize_ck(&byte_vec.into_boxed_slice().deref())?;
 
     println!("encrypting string...");
-    let enc_data = encryptStr("aa", &ck);
-    let enc_ascii = encryptascii("aa", &ck);
+    let enc_data = encryptStr("kapple", &ck);
+    let enc_ascii = encryptascii("kapple", &ck);
 
     println!("serializing encrypted string...");
     let mut serialized_enc_str = Vec::new();
@@ -51,26 +51,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
 }
 
 
-pub fn encryptascii(content: &str, ck: &ClientKey) -> Vec<FheUint<FheUint32Id>>{
+pub fn encryptascii(content: &str, ck: &ClientKey) -> Vec<FheUint<FheUint16Id>>{
     let mut v = vec![];
     for byte in content.bytes() {
         //let encode_char = byte - 97 + 0*2;
-        v.push(FheUint32::encrypt(byte, ck));
+        v.push(FheUint16::encrypt(byte, ck));
     }
     v
 }
 
-pub fn encryptStr(content: &str, ck: &ClientKey) -> Vec<FheUint<FheUint32Id>> {
+pub fn encryptStr(content: &str, ck: &ClientKey) -> Vec<FheUint<FheUint16Id>> {
     let mut v:Vec<u8> = content.chars().map(|c| match c {
         'a' => 1,
-        'b' => 2,
-        _ => 3,
+        'p' => 2,
+        'l' => 3,
+        'e' => 4,
+        _ => 5,
     }).collect();
     println!("encryptedstr is{:?}:", v);
 
     let mut r = vec![];
     for i in v{
-        r.push(FheUint32::encrypt(i, ck));
+        r.push(FheUint16::encrypt(i, ck));
     }
     r
 
@@ -103,7 +105,13 @@ fn deserialize_ck(serialized_data: &[u8]) -> Result<ClientKey, Box<dyn std::erro
 }
 
 fn my_key_gen() -> Result<(), Box<dyn std::error::Error>> {
-    let config = ConfigBuilder::default().build();
+    //let config = ConfigBuilder::default().build();
+    let config = ConfigBuilder::default()
+        .use_custom_parameters(
+            tfhe::shortint::parameters::PARAM_MULTI_BIT_MESSAGE_2_CARRY_2_GROUP_3_KS_PBS,
+            None,
+        )
+        .build();
     let ( client_key, server_key) = generate_keys(config);
     //set_server_key(server_key.clone());
 
@@ -126,17 +134,18 @@ fn my_key_gen() -> Result<(), Box<dyn std::error::Error>> {
 }
 fn deserialize_str(
     serialized_data: &[u8],
-) -> Result<Vec<FheUint<FheUint32Id>>, Box<dyn std::error::Error>> {
+    content_size: u8
+) -> Result<Vec<FheUint<FheUint16Id>>, Box<dyn std::error::Error>> {
     let mut to_des_data = Cursor::new(serialized_data);
-    let mut v: Vec<FheUint<FheUint32Id>> = vec![];
-    for _ in 0..6 {
+    let mut v: Vec<FheUint<FheUint16Id>> = vec![];
+    for _ in 0..content_size {
         // length of received string
         v.push(bincode::deserialize_from(&mut to_des_data)?);
     }
     Ok(v)
 }
 
-pub fn decryptStr(content: Vec<FheUint<FheUint32Id>>, ck: &ClientKey) -> String {
+pub fn decryptStr(content: Vec<FheUint<FheUint16Id>>, ck: &ClientKey) -> String {
     let mut v = vec![];
     for byte in content {
         v.push(byte.decrypt(&ck));
