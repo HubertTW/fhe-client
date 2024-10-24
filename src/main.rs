@@ -1,7 +1,9 @@
+#![allow(warnings)]
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Write};
 use std::ops::Deref;
+use std::time::{Duration, Instant};
 use tfhe::integer::{gen_keys_radix, IntegerRadixCiphertext, RadixCiphertext, RadixClientKey};
 use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_KS_PBS;
 use bincode;
@@ -9,18 +11,22 @@ use tfhe::{ClientKey, ConfigBuilder, FheUint, FheUint16, FheUint16Id, FheUint32,
 use tfhe::prelude::{FheDecrypt, FheEncrypt};
 
 fn main() -> Result<(), Box<dyn std::error::Error>>{
-    my_key_gen()?;
+    //println!("");
+    //my_key_gen()?;
 
-    println!("reading client key...");
+    //println!("reading client key...");
     let mut byte_vec = fs::read("client_key.bin")?;
 
-    println!("deserializing client key...");
+    //println!("deserializing client key...");
     let ck = deserialize_ck(&byte_vec.into_boxed_slice().deref())?;
 
-    println!("encrypting string...");
-    let enc_data = encryptStr("kapple", &ck);
-    let enc_ascii = encryptascii("kapple", &ck);
 
+    //let enc_data = encryptStr("kapple", &ck);
+    let s = "cat";
+    let enc_ascii = encryptascii(s.clone(), &ck);
+    println!("encrypting {:?} string...", s.clone());
+
+    /*
     println!("serializing encrypted string...");
     let mut serialized_enc_str = Vec::new();
     for i in enc_data.clone() {
@@ -29,8 +35,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
     let mut file_str = File::create("encrypted_str.bin")?;
     file_str.write(serialized_enc_str.as_slice())?;
     println!("done");
-
-    println!("serializing encrypted ascii...");
+    */
+    println!("serializing encrypted string...");
     let mut serialized_enc_str = Vec::new();
     for i in enc_ascii.clone() {
         bincode::serialize_into(&mut serialized_enc_str, &i)?;
@@ -53,10 +59,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
 
 pub fn encryptascii(content: &str, ck: &ClientKey) -> Vec<FheUint<FheUint16Id>>{
     let mut v = vec![];
+
+    let measurements = 100;
+    let mut elapsed_times: Vec<Duration> = Vec::new();
+
     for byte in content.bytes() {
         //let encode_char = byte - 97 + 0*2;
         v.push(FheUint16::encrypt(byte, ck));
     }
+
+    for _ in 0..measurements {
+
+        let start = Instant::now();
+
+        for byte in content.bytes() {
+            //let encode_char = byte - 97 + 0*2;
+            FheUint16::encrypt(byte, ck);
+        }
+
+        let elapsed = start.elapsed();
+        elapsed_times.push(elapsed);
+
+        //println!("Elapsed time: {:?}", elapsed);
+    }
+
+    // 計算平均經過時間
+    let total_elapsed: Duration = elapsed_times.iter().sum();
+    let average_elapsed = total_elapsed / (measurements as u32);
+
+    //println!("Average elapsed time: {:?}", average_elapsed);
     v
 }
 
