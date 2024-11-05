@@ -11,7 +11,6 @@ use tfhe::{ClientKey, ConfigBuilder, FheUint, FheUint16, FheUint16Id, FheUint32,
 use tfhe::prelude::{FheDecrypt, FheEncrypt};
 
 fn main() -> Result<(), Box<dyn std::error::Error>>{
-    //println!("");
     //my_key_gen()?;
 
     //println!("reading client key...");
@@ -21,21 +20,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
     let ck = deserialize_ck(&byte_vec.into_boxed_slice().deref())?;
 
 
-    //let enc_data = encryptStr("kapple", &ck);
-    let s = "cat";
+    let s = "the apple fuck";
     let enc_ascii = encryptascii(s.clone(), &ck);
     println!("encrypting {:?} string...", s.clone());
 
-    /*
-    println!("serializing encrypted string...");
-    let mut serialized_enc_str = Vec::new();
-    for i in enc_data.clone() {
-        bincode::serialize_into(&mut serialized_enc_str, &i)?;
-    }
-    let mut file_str = File::create("encrypted_str.bin")?;
-    file_str.write(serialized_enc_str.as_slice())?;
-    println!("done");
-    */
+    let enc_zero = FheUint16::encrypt(0u8, &ck);
+    let enc_one = FheUint16::encrypt(1u8, &ck);
+
+    encryptPosition(s.clone(), &enc_zero, &enc_one).expect("serialization string wrong");
+    encryptLastPosition(s.clone(), &enc_zero, &enc_one).expect("serialization last char wrong");
+
+
+
     println!("serializing encrypted string...");
     let mut serialized_enc_str = Vec::new();
     for i in enc_ascii.clone() {
@@ -45,14 +41,94 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
     file_str.write(serialized_enc_str.as_slice())?;
     println!("done");
 
-    //println!("deserializing intercepted_payload.bin...");
-    //let file = fs::read("encrypted_str.bin")?;
-    //let enc_str = deserialize_str(&file)?;
-
-    //let s = decryptStr(enc_str.clone(), &ck);
-    //println!("the decrypted str is {}",s);
 
     Ok(())
+
+}
+
+pub fn encryptPosition(s: &str, zero: &FheUint16, one: &FheUint16)-> Result<(), Box<dyn std::error::Error>>{
+
+    let text = s.clone();
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut count = 1;
+
+    //let mut position_res: Vec<Vec<u8>> = Vec::new();
+
+    for word in &words {
+        let mut mask = Vec::new();
+        let mut debug_mask = Vec::new();
+        let mut iter = text.chars();
+
+        while let Some(c) = iter.next() {
+            if let Some(pos) = text.find(word) {
+                if pos <= mask.len() && mask.len() < pos + word.len() {
+                    mask.push(&zero);
+                    debug_mask.push(0);
+                } else if c == ' ' {
+                    mask.push(&one);
+                    debug_mask.push(1);
+                } else {
+                    mask.push(&one);
+                    debug_mask.push(1);
+                }
+            }
+        }
+
+        println!("DEBUG: every string mask{:?} ", debug_mask);
+        let mut serialized_enc_position = Vec::new();
+        for i in mask.clone() {
+            bincode::serialize_into(&mut serialized_enc_position, &i)?;
+        }
+
+        let mut file_str = File::create(String::from("string_") + &count.to_string())?;
+        file_str.write(serialized_enc_position.as_slice())?;
+        count += 1;
+
+    }
+    Ok(())
+
+}
+pub fn encryptLastPosition(s: &str, zero: &FheUint16, one: &FheUint16)-> Result<(), Box<dyn std::error::Error>>{
+
+    let text = s.clone();
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut count = 1;
+
+    for word in &words {
+        let mut mask = Vec::new();
+        let mut debug_mask = Vec::new();
+        let mut position = 0;
+
+        for c in text.chars() {
+            if c.is_whitespace() {
+                mask.push(&zero);
+                debug_mask.push(0);
+            } else if position == text.find(word).unwrap() + word.len() - 1 {
+                mask.push(&one);
+                debug_mask.push(1);
+            } else {
+                mask.push(&zero);
+                debug_mask.push(0);
+            }
+            position += 1;
+        }
+
+        println!("DEBGU: every last pos mask {:?} ", debug_mask);
+        let mut serialized_enc_last_char = Vec::new();
+        for i in mask.clone() {
+            bincode::serialize_into(&mut serialized_enc_last_char, &i)?;
+        }
+
+        let mut file_str = File::create(String::from("last_char_") + &count.to_string())?;
+        file_str.write(serialized_enc_last_char.as_slice())?;
+        count += 1;
+
+
+    }
+
+
+    Ok(())
+
 
 }
 
@@ -86,8 +162,8 @@ pub fn encryptascii(content: &str, ck: &ClientKey) -> Vec<FheUint<FheUint16Id>>{
     // 計算平均經過時間
     let total_elapsed: Duration = elapsed_times.iter().sum();
     let average_elapsed = total_elapsed / (measurements as u32);
+    println!("Average elapsed time: {:?}", average_elapsed);
 
-    //println!("Average elapsed time: {:?}", average_elapsed);
     v
 }
 
