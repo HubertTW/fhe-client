@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
     let ck = deserialize_ck(&byte_vec.into_boxed_slice().deref())?;
 
 
-    let s = "the apple fuck";
+    let s = "fuck you f";
     let enc_ascii = encryptascii(s.clone(), &ck);
     println!("encrypting {:?} string...", s.clone());
 
@@ -48,33 +48,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
 
 pub fn encryptPosition(s: &str, zero: &FheUint16, one: &FheUint16)-> Result<(), Box<dyn std::error::Error>>{
 
-    let text = s.clone();
-    let words: Vec<&str> = text.split_whitespace().collect();
+    let words: Vec<&str> = s.split_whitespace().collect();
+    let mut results: Vec<Vec<u8>> = Vec::new();
     let mut count = 1;
-
-    //let mut position_res: Vec<Vec<u8>> = Vec::new();
+    let mut current_position = 0;
 
     for word in &words {
-        let mut mask = Vec::new();
-        let mut debug_mask = Vec::new();
-        let mut iter = text.chars();
-
-        while let Some(c) = iter.next() {
-            if let Some(pos) = text.find(word) {
-                if pos <= mask.len() && mask.len() < pos + word.len() {
-                    mask.push(&zero);
-                    debug_mask.push(0);
-                } else if c == ' ' {
-                    mask.push(&one);
-                    debug_mask.push(1);
-                } else {
-                    mask.push(&one);
-                    debug_mask.push(1);
-                }
+        let mut mask = vec![one; s.len()]; // 初始化為 1 的掩碼陣列
+        let mut mask_debug = vec![1; s.len()];
+        if let Some(pos) = s[current_position..].find(word) {
+            let absolute_pos = current_position + pos; // 絕對位置
+            for i in absolute_pos..absolute_pos + word.len() {
+                mask[i] = zero;
+                mask_debug[i] = 0;
             }
+            current_position = absolute_pos + word.len(); // 更新位置
         }
 
-        println!("DEBUG: every string mask{:?} ", debug_mask);
+        println!("DEBUG: every string mask{:?} ", mask_debug);
         let mut serialized_enc_position = Vec::new();
         for i in mask.clone() {
             bincode::serialize_into(&mut serialized_enc_position, &i)?;
@@ -85,35 +76,34 @@ pub fn encryptPosition(s: &str, zero: &FheUint16, one: &FheUint16)-> Result<(), 
         count += 1;
 
     }
+
+
+
+
+
+
     Ok(())
 
 }
 pub fn encryptLastPosition(s: &str, zero: &FheUint16, one: &FheUint16)-> Result<(), Box<dyn std::error::Error>>{
 
-    let text = s.clone();
-    let words: Vec<&str> = text.split_whitespace().collect();
+    let words: Vec<&str> = s.split_whitespace().collect();
+    let mut results: Vec<Vec<u8>> = Vec::new();
     let mut count = 1;
 
+    let mut current_position = 0;
+
     for word in &words {
-        let mut mask = Vec::new();
-        let mut debug_mask = Vec::new();
-        let mut position = 0;
-
-        for c in text.chars() {
-            if c.is_whitespace() {
-                mask.push(&zero);
-                debug_mask.push(0);
-            } else if position == text.find(word).unwrap() + word.len() - 1 {
-                mask.push(&one);
-                debug_mask.push(1);
-            } else {
-                mask.push(&zero);
-                debug_mask.push(0);
-            }
-            position += 1;
+        let mut mask = vec![zero; s.len()]; // 初始化為 1 的掩碼陣列
+        let mut mask_debug = vec![0; s.len()];
+        if let Some(pos) = s[current_position..].find(word) {
+            let absolute_pos = current_position + pos; // 絕對位置
+            let last_char_pos = absolute_pos + word.len() - 1; // 單字最後一個字元的位置
+            mask[last_char_pos] = one;
+            mask_debug[last_char_pos] = 1;
+            current_position = absolute_pos + word.len(); // 更新位置
         }
-
-        println!("DEBGU: every last pos mask {:?} ", debug_mask);
+        println!("DEBGU: every last pos mask {:?} ", mask_debug);
         let mut serialized_enc_last_char = Vec::new();
         for i in mask.clone() {
             bincode::serialize_into(&mut serialized_enc_last_char, &i)?;
@@ -123,8 +113,10 @@ pub fn encryptLastPosition(s: &str, zero: &FheUint16, one: &FheUint16)-> Result<
         file_str.write(serialized_enc_last_char.as_slice())?;
         count += 1;
 
-
     }
+
+
+
 
 
     Ok(())
