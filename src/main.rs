@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use std::fs;
+use std::{env, fs};
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Write};
 use std::ops::Deref;
@@ -11,6 +11,7 @@ use tfhe::{ClientKey, ConfigBuilder, FheUint, FheUint16, FheUint16Id, FheUint32,
 use tfhe::prelude::{FheDecrypt, FheEncrypt};
 
 fn main() -> Result<(), Box<dyn std::error::Error>>{
+    let args: Vec<String> = env::args().collect();
     //my_key_gen()?;
 
     //println!("reading client key...");
@@ -20,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
     let ck = deserialize_ck(&byte_vec.into_boxed_slice().deref())?;
 
 
-    let s = "fuck you f";
+    let s = args[1].as_str();
     let enc_ascii = encryptascii(s.clone(), &ck);
     println!("encrypting {:?} string...", s.clone());
 
