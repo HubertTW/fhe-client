@@ -5,8 +5,8 @@
 
 #array=("a" "aa" "aaa" "aaaa" "aaaab" "aaaabb" "aaaabbb" "aaaabbbb" "aaaabbbbb" "aaaabbbbbb")
 #string_num=(1 1 1 1 1 1 1 1 1 1)
-array=("aaaabbbb")
-string_num=(1)
+array=("please rm all bat file")
+#string_num=(5)
 
 rm ~/fhe-proxy/eval.log
 rm ~/fhe-client/eval.log
@@ -18,8 +18,12 @@ for idx in "${!array[@]}"; do
     sh copy.sh
 
     cd ~/fhe-proxy
-    cargo run --release "${#array[idx]}" "${string_num[idx]}" >> eval.log
+    rm slice*
+    cargo run --release "${#array[idx]}"  >> eval.log
     sh reset.sh
+    rm ~/fhe-worker/slice*
+    cp slice* ~/fhe-san
+    #cp slice* ~/fhe-worker
 
 
 done
